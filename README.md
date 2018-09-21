@@ -20,3 +20,4 @@ Current list of topics:
 - Intro to network biology (Sapan)
 - Intro to Docker
 - Intro to git
+- Intro to LaTeX
