@@ -2,7 +2,7 @@
 UB Biomedical Informatics Peer2Peer Sessions
 
 Current list of topics:
-- Intro to CCR (Zack)
+- [Intro to CCR](https://github.com/UB-BiomedicalInformatics/BMI_p2p_sessions/wiki/CCR) (Zack)
 - Top keywords discussion in Biomedical Informatics (Multiple Presenters?)
 - EHR, Part 1 — Intro and AllScripts demo (Jonathan)
 - EHR Part 2 — Compare/contrast four major EHRs (Cerner, Epic, Allscripts, MEDITECH) (Angie)
