@@ -5,7 +5,7 @@ Current list of topics:
 - [Intro to CCR](https://github.com/UB-BiomedicalInformatics/BMI_p2p_sessions/wiki/CCR) (Zack)
 - Top keywords discussion in Biomedical Informatics (Multiple Presenters?)
 - EHR, Part 1 — Intro and AllScripts demo (Jonathan)
-- [EHR Part 2 — Compare/contrast four major EHRs (Cerner, Epic, Allscripts, MEDITECH)] (https://github.com/UB-BiomedicalInformatics/BMI_p2p_sessions/P2P EHR.pptx) (Angie)
+- [EHR Part 2 — Compare/contrast four major EHRs (Cerner, Epic, Allscripts, MEDITECH)](https://github.com/UB-BiomedicalInformatics/BMI_p2p_sessions/P2P_EHR.pptx) (Angie)
 - Bioinformatics tools
 - Cheminformatics tools
 - Intro to CANDO
