@@ -5,7 +5,7 @@
 ## load the data
 #install.packages("mlbench")
 #install.packages("corrplot")
-install.packages("caret")
+#install.packages("caret")
 #install.packages("randomForest")
 #install.packages("e1071")
 #install.packages("tree")
@@ -24,8 +24,6 @@ data("PimaIndiansDiabetes2", package = "mlbench")
 
 ## set seed for randomization
 set.seed(123)
-
-remove.packages(c("caret", "dplyr", "tidyverse"))
 
 head(PimaIndiansDiabetes2)
 pima<- PimaIndiansDiabetes2
@@ -94,7 +92,6 @@ validation.data <- training.data[-index[1:n.train],]
 dim(training.data)
 dim(validation.data)
 
-
 rf.pima_fin<-randomForest(diabetes ~., data=training.data,  mtry=3, ntree=1000, importance=T)
 rf.pima_fin
 importance(rf.pima_fin)
@@ -132,8 +129,59 @@ model$bestTune
 # Final model
 model$finalModel
 # Make predictions on the test data
-predicted.classes <- model %>% predict(testing.data)
+predicted.classes <- predict(model,testing.data)
 # Compute model accuracy rate
 mean(predicted.classes == testing.data$diabetes)
+
 #Compute error
 mean(predicted.classes != testing.data$diabetes)
+
+#install.packages("mice", dependencies=TRUE)
+library(mice)
+
+# Let's use decision trees (CART) to impute missing values
+imp = mice(pima, meth = "cart", minbucket = 5)
+imp1 = complete(imp)
+
+nrow(imp1)
+
+head(imp1)
+
+###build random forest model with full dataset and cross validation
+
+## with cross validation
+# split our data into train and test sets
+
+# Set the fraction of the training data
+training.fraction <- 0.7
+
+# Train and Test Split using randomization
+sample.size <- nrow(imp1)
+index <- sample(1:sample.size)
+n.train <- floor(sample.size*training.fraction)
+training.data <- imp1[index[1:n.train],]
+testing.data <- imp1[-index[1:n.train],]
+dim(training.data)
+dim(testing.data)
+
+# Fit the model on the training set
+model <- train(
+  diabetes ~., data = training.data, method = "rf",
+  trControl = trainControl("cv", number = 10),
+  importance = TRUE, ntree=500
+  )
+# Best tuning parameter
+model$bestTune
+# Final model
+model$finalModel
+importance(model$finalModel)
+# Make predictions on the test data
+predicted.classes <- predict(model,testing.data)
+# Compute model accuracy rate
+mean(predicted.classes == testing.data$diabetes)
+
+#Compute error
+mean(predicted.classes != testing.data$diabetes)
+
+
+
