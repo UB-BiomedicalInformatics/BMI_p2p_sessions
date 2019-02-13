@@ -1,0 +1,248 @@
+
+# Linear Regression
+
+###  Regression is a method of predicting a response/dependent/target value based on predictors/independent/features.  Regression techniques primarily differ based the type of relationship between the independent and dependent variables.
+
+#### Examples:
+Linear Regression: the response (y) is continuous
+
+Logistic Regression: the response (y) is categorical
+
+For all models, the predictors (x) can be binary (2 categories), ordinal, continuous, count, or categorical.
+
+
+![Image of Regression](https://cdn-images-1.medium.com/max/1600/0*szXvH1a4ZQytyqhg.png)
+
+### Linear Regression Equation:
+
+$y=\beta_0+\beta_1x_1+\beta_2x_2...+\beta_px_p+\epsilon$
+
+where $\epsilon \sim N(0, \sigma^2)$
+
+What do we want to do? Find the best values for our $\beta_0...\beta_p$.
+
+How do we do that? minimize the error between the predicted value and the actual value
+
+## Problem: Predict the level of prostate-specific antigen using clinical measures in men who were about to receive a radical prostectomy.
+
+#### Data:
+
+A data frame with 97 observations on the following 10 variables.
+
+lcavol: log cancer volume  
+lweight: log prostate weight  
+age: in years  
+lbph: log of the amount of benign prostatic hyperplasia  
+svi: seminal vesicle invasion  
+lcp: log of capsular penetration  
+gleason: a numeric vector  
+pgg45: percent of Gleason score 4 or 5  
+lpsa: response (y)  
+train: logical vector  
+
+
+```{r}
+## Let's load the data! The data can be downloaded from the Elementary Statistical Learning packages
+#install.packages("ElemStatLearn") ### note: if you have not installed this packages, you must remove the # at the front of this line
+library(ElemStatLearn)
+
+data(prostate)
+names(prostate)
+set.seed(123)
+```
+
+### To fit a model and test it, you need to split the data into training, validation (to tune hyperparameters), and test sets.
+
+#### Training Dataset: The sample of data used to fit the model.
+
+#### Validation Dataset: The sample of data used to provide an unbiased evaluation of a model fit on the training dataset while tuning model hyperparameters.
+
+#### Test Dataset: The sample of data used to provide an unbiased evaluation of a final model fit on the training dataset.
+
+#### What is cross-validation? 
+The goal of cross-validation is to test the model’s ability to predict new data that was not used in estimating it, in order to flag problems like overfitting or selection bias and to give an insight on how the model will generalize to an independent dataset. You use your training set to generate multiple splits and perform the analysis on one subset (called the training set) and validate the analysis on the other subset (validation set).  The most popular is k-fold cross validation.
+
+![Image of Split](https://cdn-images-1.medium.com/max/1600/1*Nv2NNALuokZEcV6hYEHdGA.png)
+
+
+```{r}
+## Since we do not have any hyperparamters to tune, let's split the data into trainig and test sets!
+
+train <- subset(prostate,train==TRUE)[,1:9]
+test <- subset(prostate,train==FALSE)[,1:9]
+```
+
+
+```{r}
+nrow(train)
+nrow(test)
+```
+
+
+```{r}
+## visualize the data
+
+pairs( prostate[,1:9], col="blue" )
+```
+
+
+```{r}
+## Let's fit our model using the training data
+
+fit1 <- lm(lpsa ~ ., data = train)
+summary(fit1)
+# lcavol and lweight are highly significant
+
+
+# Compute 95% confidence interval
+confint(fit1,level=0.95)
+
+```
+
+
+```{r}
+### How well does our model do when we generalize it to an independent test set?
+
+# Prediction
+prediction1 <- predict(fit1, newdata = test[,1:8])
+predict(fit1, newdata = test[,1:8], interval = "confidence", level=0.95)
+
+```
+
+#### Remember that we wanted to minimize error.  What is our training error? What is our testing error?
+
+Training Error: $\frac{1}{n_{train}} \sum(y_{train}-x_{train}(b_{train})^2$
+Test Error: $\frac{1}{n_{test}} \sum(y_{test}-x_{test}(b_{test})^2$
+
+
+```{r}
+# Calculate the training error
+mean(fit1$residuals^2)
+# Calculate the prediction error
+mean((prediction1-test[,9])^2)
+```
+
+### Can we do better? What is the bias-variance trade-off in linear regression?
+#### The bias is the difference between the true population parameter and the expected estimator.
+#### Variance, on the other hand, measures the spread, or uncertainty, in these estimates.
+
+We want both the bias and the variance to be low (large values result in poor predictions from the model). Model's error can be decomposed into three parts: error resulting from a large variance, error resulting from significant bias, and the unexplainable part.
+![Image of Split](https://res.cloudinary.com/dyd911kmh/image/upload/f_auto,q_auto:best/v1543418451/bias_vs_variance_swxhxx.jpg)
+
+* OLS can have a huge variance when there are many predictors (high-dimensionality) or when the predictors are highly correlated with each other (both common problems in medical and clinical data!!!)
+
+* Solution: reduce variance at the cost of introducing some bias--we can do this by regularization methods!
+
+### Ridge Regularization: keeps all variables in the model, but penalizes variables that increase variance
+![Image of Regression](https://res.cloudinary.com/dyd911kmh/image/upload/f_auto,q_auto:best/v1543418449/eq7_ylxudw.png)
+
+Setting $\lambda$ to 0 is the same as using the OLS, while the larger its value, the stronger the coefficients' size penalized.  As $\lambda$ becomes larger, the variance decreases, and the bias increases.
+
+#### Ridge works well if there are many large parameters of about the same value
+
+How do you choose the hyperparameter $\lambda$?  cross-validation or seperate validation set!
+
+
+```{r}
+## let's use cross-validation!
+#install.packages("glmnet")
+library(glmnet)  
+# Perform 5-fold cross-validation to select lambda ---------------------------
+lambdas_to_try <- 10^seq(-3, 5, length.out = 100)
+# Setting alpha = 0 implements ridge regression
+ridge_cv <- cv.glmnet(as.matrix(train[,1:8]), as.vector(train[,9]), alpha = 0, lambda = lambdas_to_try,
+                      standardize = TRUE, nfolds = 5)  #alpha=0 means ridge regression
+# Plot cross-validation results
+plot(ridge_cv)
+```
+
+
+```{r}
+# Best cross-validated lambda
+lambda_cv <- ridge_cv$lambda.min
+lambda_cv
+# Fit final model, get its sum of squared residuals, multiple R-squared, and training error
+model_cv <- glmnet(as.matrix(train[,1:8]), as.vector(train[,9]), alpha = 0, lambda = lambda_cv, standardize = TRUE)
+coef(model_cv)
+
+
+#since lambda close to 0 should be close to OLS estimates
+
+y_hat_cv <- predict(model_cv, as.matrix(train[,1:8]))
+ssr_cv <- t(as.vector(train[,9]) - y_hat_cv) %*% (as.vector(train[,9]) - y_hat_cv)
+rsq_ridge_cv <- cor(as.vector(train[,9]), y_hat_cv)^2
+
+
+mean(ssr_cv)
+rsq_ridge_cv
+```
+
+
+```{r}
+# Get test error
+y_hat_cv <- predict(model_cv, newx=as.matrix(test[,1:8]), type="response")
+#ssr_cv <- t(as.vector(test[,9]) - y_hat_cv) %*% (as.vector(test[,9]) - y_hat_cv)
+rsq_ridge_cv <- cor(as.vector(test[,9]), y_hat_cv)^2
+
+prediction.errors=mean((y_hat_cv-test[,9])^2) #mean squared error
+prediction.errors  ## lower than before!
+ssr_cv
+#rsq_ridge_cv
+```
+
+### Lasso Regularization: Unlike ridge regression, which penalizes sum of squared coefficients (L2 penalty), lasso penalizes the sum of their absolute values (L1 penalty). As a result, for high values of $\lambda$, many coefficients are exactly 0 under lasso.
+
+![Image of Lasso](https://res.cloudinary.com/dyd911kmh/image/upload/f_auto,q_auto:best/v1543418448/eq11_ij4mms.png)
+
+#### Lasso performs variable selection!  Lasso tends to do well if there are a small number of significant parameters and the others are close to zero 
+
+
+```{r}
+# Perform 5-fold cross-validation to select lambda ---------------------------
+lambdas_to_try <- 10^seq(-3, 5, length.out = 100)
+# Setting alpha = 0 implements ridge regression
+lasso_cv <- cv.glmnet(as.matrix(train[,1:8]), as.vector(train[,9]), alpha = 1, lambda = lambdas_to_try,
+                      standardize = TRUE, nfolds = 5)  #alpha=0 means ridge regression
+# Plot cross-validation results
+plot(lasso_cv)
+```
+
+
+```{r}
+# Best cross-validated lambda
+lambda_cv <- lasso_cv$lambda.min
+lambda_cv
+# Fit final model, get its sum of squared residuals and multiple R-squared
+model_cv <- glmnet(as.matrix(train[,1:8]), as.vector(train[,9]), alpha = 1, lambda = lambda_cv, standardize = TRUE)
+
+coef(model_cv)
+
+
+y_hat_cv <- predict(model_cv, as.matrix(test[,1:8]))
+ssr_cv <- t(as.vector(test[,9]) - y_hat_cv) %*% (as.vector(test[,9]) - y_hat_cv)
+rsq_lasso_cv <- cor(as.vector(test[,9]), y_hat_cv)^2
+
+
+prediction.errors=mean((y_hat_cv-test[,9])^2) 
+prediction.errors  ## lower than before!
+ssr_cv
+#rsq_lasso_cv
+```
+
+
+```{r}
+## Let's look at how coefficients shrink
+res <- glmnet(as.matrix(train[,1:8]), as.vector(train[,9]), alpha = 1, lambda = lambdas_to_try, standardize = FALSE)
+plot(res, xvar = "lambda", col=1:8)
+legend("bottomright", lwd = 1, col = 1:8, legend = colnames(as.matrix(train[,1:8])), cex = .7)
+```
+
+### Elastic Net: combine the penalties of ridge regression and lasso. Minimizes:
+
+![Image of elastic](https://res.cloudinary.com/dyd911kmh/image/upload/f_auto,q_auto:best/v1543418448/eq12_vh6ilt.png)
+
+where $\alpha$ is the mixing parameter between lasso and ridge.  We now have two parameters to tune-- $\alpha$ and $\lambda$  
+
+This can be done using R package caret. 
+
+## All of these methods can be used for logistic regression!

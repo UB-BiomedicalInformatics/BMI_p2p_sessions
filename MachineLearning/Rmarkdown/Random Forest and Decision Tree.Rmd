@@ -1,0 +1,299 @@
+
+# Random Forest and Decision Trees
+
+![Image of Regression](https://www.researchgate.net/profile/Carmen_Aleman/publication/6308052/figure/download/fig1/AS:371012928589827@1465467783745/Decision-tree-showing-the-risk-of-malignant-effusion-when-medical-history-and-diagnostic.png)
+
+
+
+
+## Decision Trees
+
+Decision trees can be used for both classification and regression.  They are similar to if/then statements.
+
+Tree depth: how many questions do we ask until we reach our decision? (denoted by its longest route)
+
+Root node: first decision
+Leaf node: final node of the tree
+
+Advantages: 
+* super easy to interpret
+* can use both qualitative and quantitative predictors and responses
+* reproducible in clinical workflow
+* fast and perform well on large datasets
+
+Disadvantages:
+* need an optimal choice at each node; at each step, the algorithm chooses the best result. Choosing the best result at a given step does not ensure an optimal decision when you make it to the leaf node
+* prone to over-fitting, especially with deep trees (fix: can set a max depth--this limits variance, but at the expense of bias!)
+
+
+```{r}
+#We are going to focus on Classification, 
+#predicting if a patient is diabetic or not
+
+## load the data
+#install.packages("mlbench")
+#install.packages("corrplot")
+#install.packages("caret")
+#install.packages("randomForest")
+#install.packages("e1071")
+#install.packages("tree")
+#install.packages("dplyr", dependencies = TRUE)
+#library(dplyr)
+library(mlbench)
+library(corrplot)
+library(caret)
+library(randomForest)
+library(tree)
+library(e1071)
+library(dplyr)
+
+
+data("PimaIndiansDiabetes2", package = "mlbench")
+?PimaIndiansDiabetes
+
+## set seed for randomization
+set.seed(123)
+```
+
+
+```{r}
+head(PimaIndiansDiabetes2)
+pima<- PimaIndiansDiabetes2
+## next we need to create a factor from our response variable
+pima$diabetes <- as.factor(pima$diabetes)
+nrow(pima)
+```
+
+#### What to do about missing data?
+First, we have a lot of missing values--missing values are inherent in MANY forms of medical informatics data.
+
+Random forest models do not handle missing values.
+
+Therefore, you can either:
+* use a different model or tool (rpart works with random forest with missing values)
+* impute missing values
+* predict them seperately
+* delete all missing value cases
+
+
+
+
+```{r}
+sapply(pima, function(x) sum(is.na(x)))
+```
+
+
+```{r}
+# for now we will ignore the missing data
+pima_nomiss<- na.omit(pima)
+nrow(pima_nomiss)
+# exploratory analysis of our data
+#scatterplot
+pairs(pima_nomiss, panel = panel.smooth)
+#correlation matrix
+corrplot(cor(pima_nomiss[, -9]), type = "lower", method = "number")
+```
+
+
+```{r}
+## split our data into train and test sets
+
+# Set the fraction of the training data
+training.fraction <- 0.7
+
+# Train and Test Split using randomization
+sample.size <- nrow(pima_nomiss)
+index <- sample(1:sample.size)
+n.train <- floor(sample.size*training.fraction)
+training.data <- pima_nomiss[index[1:n.train],]
+testing.data <- pima_nomiss[-index[1:n.train],]
+dim(training.data)
+dim(testing.data)
+```
+
+
+```{r}
+## decision tree of classifying to diabetes
+
+# Training The Model
+treemod <- tree(diabetes ~ ., data = training.data)
+
+summary(treemod)
+
+
+```
+
+The results show that six variables ("glucose"  "age"      "pedigree" "pressure" "insulin"  "triceps") are used in building the decision tree. With a training error rate of 12.41% and 18 terminal nodes.
+
+
+```{r}
+treemod # get a detailed text output.
+```
+
+The results display the split criterion (e.g. Plasma_Glucose < 127.5), the number of observations in that branch, the deviance, the overall prediction for the branch (Yes or No), and the fraction of observations in that branch that take on values of Yes and No. Branches that lead to terminal nodes are indicated using asterisks.
+
+
+```{r}
+plot(treemod)
+text(treemod, pretty = 0)
+```
+
+
+```{r}
+### Lets test the model using our held-out test set.
+
+tree_pred <- predict(treemod, newdata = testing.data, type = "class" )
+confusionMatrix(tree_pred, testing.data$diabetes)
+```
+
+![Image of Regression](https://img.grepmed.com/uploads/1480/negativepredictivevalue-positivepredictivevalue-epidemiology-sensitivity-calculation-original.gif)
+
+We can also find the F1 score, which is the harmonic mean of precision (PPV) and recall (sensitivity).  
+
+
+```{r}
+A<- confusionMatrix(tree_pred, testing.data$diabetes)
+```
+
+
+```{r}
+F1<- 2* (A$byClass['Sensitivity']* A$byClass['Pos Pred Value'])/(A$byClass['Sensitivity']+ A$byClass['Pos Pred Value'])
+F1
+```
+
+## Random Forests
+
+Remember: decision trees have high variance and high bias.  We would like to minimize both!
+
+A random forest is a collection of decision trees whose results are aggregated into one final result.
+
+They limit overfitting without substantially increasing bias!
+
+How do they reduce variance?
+* training on different random subsamples
+* training on different randomized subsets of features
+
+This is really great for medical data because we usually have a ton of features and creating a lot of decision trees, we should include a lot of important features for classification.
+
+For random forests we need to assess hyperparameters, so we should split our training data into training and validation sets OR use cross validation.
+
+
+```{r}
+# Set the fraction of the training data
+training.fraction <- 0.8
+
+# Split training data into train and validation
+sample.size <- nrow(training.data)
+index <- sample(1:sample.size)
+n.train <- floor(sample.size*training.fraction)
+training.data <- training.data[index[1:n.train],]
+validation.data <- training.data[-index[1:n.train],]
+dim(training.data)
+dim(validation.data)
+```
+
+# run a random forest model on the training set
+
+## How do you choose m?
+
+For classification, the default value of $m=\sqrt{p}$.  Since, $p=8$, this default value is 2.83 (rounded to 3).  In addition, $m=p=8$, $m=p/2=4$, and $m=2$ will be assessed. $m=\{2,3,4,8\}$.  We will run 1000 trees for each m.
+
+```{r}
+ rf.pima<-randomForest(diabetes ~., data=training.data,  mtry=3, ntree=500, importance=T)
+    # get error rate for validation data
+    yhat=predict(rf.pima, validation.data)
+     y=validation.data$diabetes
+    error_rate_validation <- mean(y != yhat)
+    error_rate_validation
+    summary(rf.pima)
+```
+```{r}
+m = c(2,3,4,6,8)
+  for (j in m){ # tree three different values for number of predictors to sample
+    set.seed(1)
+    rf.pima<-randomForest(diabetes ~., data=training.data,  mtry=j, ntree=1000, importance=T)
+    # get oob error rate for training data
+    yhat=rf.pima$predicted
+    y=train$pima
+    error_rate_train <- mean(y != yhat)
+    yhat_val=predict(rf.pima, validation.data)
+    y_test = validation.data$diabetes
+    error_rate_test <-mean(y_test != yhat_val)
+    if (exists('err')==FALSE){
+      err = c(j,"oob_error", error_rate_train)
+      err = rbind(err, c(j, "validation_error", error_rate_test))}# create initial data frame
+    else{
+      err = rbind(err, c(j,"oob_error", error_rate_train))
+      err = rbind(err, c(j, "validation_error", error_rate_test))# append to data frame of error rates, ntree, and mtry
+    }
+  }
+
+err <- as.data.frame(err) # convert to data frame
+#names(err) <- c('mtry', 'Error_Type', 'rate') # add column names
+#err$mtry <- as.numeric(err$mtry) # mtry to factor
+err <- err %>% arrange(mtry)
+library(ggplot2)
+#ggplot(err, aes(x=as.factor(mtry), y=rate, group=Error_Type)) + geom_line(aes(color=Error_Type)) +xlab("M") + ylab("Missclassification Error") + ggtitle("Sensitivity of M for Random Forest") 
+# create plot
+err
+```
+
+Each bagged tree makes use of around two-thirds of the observations. The remaining one-third of the observations not used to fit a given bagged tree are referred to as the out-of-bag (OOB) observations.
+
+For each tree, OOB error is the model error in predicting the data left out of the training set for that tree. OOB is a very straightforward way to estimate the test error of a bagged model, without the need to perform cross-validation or the validation set approach.
+
+
+```{r}
+rf.pima_fin<-randomForest(diabetes~., data=training.data,  mtry=3, ntree=800, importance=T)
+rf.pima_fin
+importance(rf.pima_fin)
+varImpPlot(rf.pima_fin, sort=T)
+```
+
+
+```{r}
+yhat = predict(rf.pima_fin, testing.data)
+y = testing.data$diabetes
+mean(y != yhat)
+```
+
+
+```{r}
+plot(rf.pima_fin)
+```
+
+
+```{r}
+## with cross validation
+# split our data into train and test sets
+
+# Set the fraction of the training data
+training.fraction <- 0.7
+
+# Train and Test Split using randomization
+sample.size <- nrow(pima_nomiss)
+index <- sample(1:sample.size)
+n.train <- floor(sample.size*training.fraction)
+training.data <- pima_nomiss[index[1:n.train],]
+testing.data <- pima_nomiss[-index[1:n.train],]
+dim(training.data)
+dim(testing.data)
+
+# Fit the model on the training set
+model <- train(
+  diabetes ~., data = training.data, method = "rf",
+  trControl = trainControl("cv", number = 10),
+  importance = TRUE
+  )
+# Best tuning parameter
+model$bestTune
+# Final model
+model$finalModel
+# Make predictions on the test data
+predicted.classes <- model %>% predict(testing.data)
+# Compute model accuracy rate
+mean(predicted.classes == testing.data$diabetes)
+#Compute error 
+mean(predicted.classes != testing.data$diabetes)
+
+```
