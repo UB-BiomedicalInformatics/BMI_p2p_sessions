@@ -142,7 +142,7 @@ text(treemod, pretty = 0)
 ### Lets test the model using our held-out test set.
 
 tree_pred <- predict(treemod, newdata = testing.data, type = "class" )
-confusionMatrix(tree_pred, testing.data$diabetes)
+confusionMatrix(tree_pred, testing.data$diabetes, positive="pos")
 ```
 
 ![Image of Regression](https://img.grepmed.com/uploads/1480/negativepredictivevalue-positivepredictivevalue-epidemiology-sensitivity-calculation-original.gif)
@@ -151,7 +151,7 @@ We can also find the F1 score, which is the harmonic mean of precision (PPV) and
 
 
 ```{r}
-A<- confusionMatrix(tree_pred, testing.data$diabetes)
+A<- confusionMatrix(tree_pred, testing.data$diabetes, positive="pos")
 ```
 
 

@@ -73,9 +73,9 @@ text(treemod, pretty = 0)
 ### Lets test the model using our held-out test set.
 
 tree_pred <- predict(treemod, newdata = testing.data, type = "class" )
-confusionMatrix(tree_pred, testing.data$diabetes)
+confusionMatrix(tree_pred, testing.data$diabetes, positive="pos")
 
-A<- confusionMatrix(tree_pred, testing.data$diabetes)
+A<- confusionMatrix(tree_pred, testing.data$diabetes, positive="pos")
 
 F1<- 2* (A$byClass['Sensitivity']* A$byClass['Pos Pred Value'])/(A$byClass['Sensitivity']+ A$byClass['Pos Pred Value'])
 F1
